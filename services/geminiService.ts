@@ -632,24 +632,25 @@ export const dressOnModel = async (
     const modelId = getModelConfig().imageEditModel;
     return withRetry(async (ai) => {
         const promptText = `
-        JOB: High-Fidelity Virtual Try-On.
-
+        Act as a professional fashion photographer and editor.
+        
         **INPUTS**:
-        - **IMAGE 1 (The Garment)**: This image contains the clothing to be worn.
-        - **IMAGE 2 (The Person)**: This image contains the model who will wear the clothing.
+        - **IMAGE 1 (Clothing)**: The garment to be worn.
+        - **IMAGE 2 (Model)**: The person who will wear the garment.
 
-        **INSTRUCTIONS**:
-        1.  **IDENTIFY**: Take the clothing items (e.g., tops, bottoms, dresses) from **IMAGE 1**.
-        2.  **APPLY**: Put these clothing items onto the person in **IMAGE 2**.
-        3.  **PRESERVE IDENTITY**: The face, hair, and body shape of the person in **IMAGE 2** MUST remain exactly the same. Do not generate a new face. Do not change the pose.
-        4.  **FIT & REALISM**: The clothing must drape naturally over the person's body in **IMAGE 2**, respecting their pose (sitting, standing, etc.). Lighting on the clothes must match **IMAGE 2**.
+        **TASK**:
+        Create a high-resolution, photorealistic composite image of the model (from Image 2) wearing the clothing (from Image 1).
+
+        **REQUIREMENTS**:
+        - **Integration**: The clothing must fit the model naturally, respecting their pose, body shape, and the lighting of the original scene.
+        - **Realism**: High fidelity texture, folds, and lighting.
+        - **Output**: A single, clean fashion image.
         
-        ${userPrompt ? `**ADDITIONAL REQUIREMENT**: ${userPrompt}` : ""}
+        ${userPrompt ? `**USER NOTE**: ${userPrompt}` : ""}
         
-        **OUTPUT REQUIREMENTS**:
-        - Photorealistic, 8k resolution.
-        - Aspect Ratio: ${aspectRatio}.
-        - No artifacts, no text.
+        **TECH SPECS**:
+        - Aspect Ratio: ${aspectRatio}
+        - No text, no logos, no artifacts.
         `;
 
         const response = await ai.models.generateContent({
@@ -666,16 +667,27 @@ export const dressOnModel = async (
             },
         });
 
-        const imagePart = response.candidates?.[0]?.content?.parts.find(p => p.inlineData);
+        const candidate = response.candidates?.[0];
+        
+        if (!candidate) {
+            throw new Error("No response candidate returned from AI.");
+        }
+        
+        if (candidate.finishReason === 'SAFETY') {
+             throw new Error("Safety Block: The AI refused to process these images. This often happens with 'virtual try-on' requests involving people. Please try different images or a less specific prompt.");
+        }
+
+        const imagePart = candidate.content?.parts?.find(p => p.inlineData);
 
         if (imagePart?.inlineData?.data) {
             return `data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`;
         } else {
-            const textPart = response.candidates?.[0]?.content?.parts.find(p => p.text);
+            const textPart = candidate.content?.parts?.find(p => p.text);
             if (textPart?.text) {
-                throw new Error(`Model returned a text response: ${textPart.text}`);
+                // If it returns text instead of image, it's often a refusal.
+                throw new Error(`Model returned a text response instead of an image: "${textPart.text}"`);
             }
-            throw new Error('No valid image data was returned from the dressing process.');
+            throw new Error('No valid image data was returned. The model may have generated empty content.');
         }
     }, 'mặc đồ lên mẫu');
 };
