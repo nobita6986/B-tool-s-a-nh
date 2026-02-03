@@ -60,7 +60,7 @@ const handleError = (error: any, context: string): never => {
     } else if (specificMessage.startsWith('model returned a text response')) {
       const modelResponse = specificMessage.substring(specificMessage.indexOf(':') + 1).trim();
       specificMessage = `AI không thể thực hiện yêu cầu và đã phản hồi: "${modelResponse}"`;
-    } else if (errorMessageLower.includes('no image was generated') || errorMessageLower.includes('no edited image was returned')) {
+    } else if (errorMessageLower.includes('no image was generated') || errorMessageLower.includes('no edited image was returned') || errorMessageLower.includes('no image data')) {
       specificMessage = 'AI không thể tạo hoặc chỉnh sửa ảnh từ yêu cầu này. Vui lòng thử một mô tả khác, có thể chi tiết hơn.';
     } else if (errorMessageLower.includes('failed to fetch')) {
         specificMessage = 'Lỗi kết nối mạng. Vui lòng kiểm tra lại đường truyền internet và thử lại.'
@@ -494,6 +494,10 @@ export const generateAdCreative = async (
                 const newMimeType = imagePart.inlineData.mimeType;
                 results.push(`data:${newMimeType};base64,${newBase64}`);
             } else {
+                const textPart = candidate.content?.parts?.find(p => p.text);
+                if (textPart?.text) {
+                     throw new Error(`Model returned a text response: ${textPart.text}`);
+                }
                 throw new Error("No image data.");
             }
         } catch (err: any) {
@@ -561,6 +565,10 @@ export const generateProductPhotoshoot = async (
                 if (imagePart?.inlineData?.data) {
                     results.push(`data:${imagePart.inlineData.mimeType};base64,${imagePart.inlineData.data}`);
                 } else {
+                     const textPart = candidate.content?.parts?.find(p => p.text);
+                    if (textPart?.text) {
+                         throw new Error(`Model returned a text response: ${textPart.text}`);
+                    }
                     throw new Error("No image data.");
                 }
             } catch (err: any) {

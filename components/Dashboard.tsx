@@ -8,8 +8,7 @@ import {
   GlobeIcon, 
   SparklesIcon, 
   EditIcon,
-  MagicWandIcon,
-  HeartIcon
+  MagicWandIcon
 } from './Icons';
 import type { Page } from '../App';
 
@@ -56,15 +55,6 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       titleKey: 'nav.imageEditor',
       descKey: 'imageEditor.description'
     },
-    {
-      id: 'breastLift',
-      targetPage: 'imageEditor', // Directs to ImageEditor page
-      toolAction: 'breastLift', // Tells ImageEditor to open this specific tool
-      icon: HeartIcon,
-      color: 'from-pink-500 to-rose-500',
-      titleKey: 'nav.breastLift',
-      descKey: 'breastLift.description'
-    },
   ];
 
   return (
@@ -85,12 +75,16 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             whileHover={{ scale: 1.03, translateY: -5 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => {
+                // @ts-ignore
                 if (tool.toolAction) {
                     // Set the active tool preference for ImageEditor
+                    // @ts-ignore
                     localStorage.setItem('tlab-ImageEditor-state', JSON.stringify({ activeTool: tool.toolAction }));
                     // Dispatch event to notify ImageEditor if it's already mounted/hidden
+                    // @ts-ignore
                     window.dispatchEvent(new CustomEvent('tlab-tool-change', { detail: tool.toolAction }));
                 }
+                // @ts-ignore
                 onNavigate((tool.targetPage || tool.id) as Page);
             }}
             className="group relative bg-slate-800/40 border border-slate-700 hover:border-slate-500 rounded-2xl p-6 cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-2xl"
