@@ -1,5 +1,6 @@
+
 import React, { useState, useRef } from 'react';
-import { editImageWithText, AspectRatio, ImageInput } from '../services/geminiService';
+import { editImageWithText, removeBackground, AspectRatio, ImageInput } from '../services/geminiService';
 import { useLanguage } from '../i18n';
 import { LoaderIcon, GlobeIcon, UploadIcon, DownloadIcon, AspectRatioSquareIcon, AspectRatioTallIcon, AspectRatioWideIcon } from '../components/Icons';
 import TrialEndedCta from '../components/TrialEndedCta';
@@ -28,9 +29,8 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
     
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [customDestination, setCustomDestination] = useState<string>('');
-    const [aspectRatio, setAspectRatio] = useState<AspectRatio>('9:16');
-    const [additionalPrompt, setAdditionalPrompt] = useState<string>('');
+    const [customPrompt, setCustomPrompt] = useState<string>('');
+    const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
     
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -41,12 +41,62 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
     const fileInputRef = useRef<HTMLInputElement>(null);
     const trialEnded = isTrial && trialCreations <= 0;
 
-    const destinations = [
-        { id: 'paris', name: 'Paris, France (Tháp Eiffel)', prompt: 'Place the subject in front of the Eiffel Tower in Paris, France. Romantic atmosphere, daytime.' },
-        { id: 'tokyo', name: 'Tokyo, Japan (Đường phố đêm)', prompt: 'Place the subject in a vibrant street in Tokyo at night, with neon lights and bustling atmosphere.' },
-        { id: 'bali', name: 'Bali, Indonesia (Bãi biển)', prompt: 'Place the subject on a beautiful beach in Bali, Indonesia. Tropical vibes, sunny day, turquoise water.' },
-        { id: 'ny', name: 'New York, USA (Times Square)', prompt: 'Place the subject in Times Square, New York City. Busy urban background, billboards, daytime.' },
-        { id: 'santorini', name: 'Santorini, Greece', prompt: 'Place the subject in Santorini, Greece, with white buildings and blue domes overlooking the sea.' }
+    const backgrounds = [
+        { icon: '🎲', name: 'Ngẫu nhiên', sub: 'AI tự chọn', prompt: 'RANDOM' },
+        { icon: '💎', name: 'Trong suốt', sub: 'Xóa nền', prompt: 'REMOVE_BG' },
+        { icon: '🛍️', name: 'Cửa hàng', sub: 'Store', prompt: 'fashion store interior' },
+        { icon: '🏖️', name: 'Bãi biển', sub: 'Beach', prompt: 'sunny tropical beach with turquoise water' },
+        { icon: '☕', name: 'Quán cà phê', sub: 'Cafe', prompt: 'cozy coffee shop interior with warm lighting' },
+        { icon: '🌸', name: 'Vườn hoa', sub: 'Garden', prompt: 'blooming flower garden with colorful flowers' },
+        { icon: '📸', name: 'Photo Studio', sub: 'Studio', prompt: 'professional photo studio background with soft lighting' },
+        { icon: '🚶', name: 'Phố đi bộ', sub: 'Street', prompt: 'bustling pedestrian street with city vibe' },
+        { icon: '🌳', name: 'Công viên', sub: 'Park', prompt: 'green public park with trees and grass, sunny day' },
+        { icon: '🍽️', name: 'Nhà hàng', sub: 'Restaurant', prompt: 'luxury restaurant interior with fine dining setup' },
+        { icon: '🏨', name: 'Khách sạn', sub: 'Hotel', prompt: 'luxury hotel lobby' },
+        { icon: '👗', name: 'Shop quần áo', sub: 'Boutique', prompt: 'chic clothing boutique interior' },
+        { icon: '🏙️', name: 'Sân thượng', sub: 'Rooftop', prompt: 'rooftop terrace with city skyline view' },
+        { icon: '🏬', name: 'TT Thương mại', sub: 'Mall', prompt: 'modern shopping mall interior' },
+        { icon: '🌿', name: 'Thiên nhiên', sub: 'Nature', prompt: 'serene natural landscape with forests' },
+        { icon: '🏙️', name: 'Đô thị', sub: 'Urban', prompt: 'modern urban city street with skyscrapers' },
+        { icon: '🌅', name: 'Hoàng hôn', sub: 'Sunset', prompt: 'scenic landscape at sunset' },
+        { icon: '💼', name: 'Văn phòng', sub: 'Office', prompt: 'modern office workspace' },
+        { icon: '🏋️', name: 'Phòng gym', sub: 'Gym', prompt: 'modern fitness gym interior' },
+        { icon: '🎪', name: 'Photo Booth', sub: 'Booth', prompt: 'fun and colorful photo booth background' },
+        { icon: '🌃', name: 'Neon City', sub: 'Neon', prompt: 'futuristic city street at night with neon lights' },
+        { icon: '🎞️', name: 'Phong cách cổ', sub: 'Vintage', prompt: 'vintage retro style room' },
+        { icon: '🛏️', name: 'Phòng ngủ', sub: 'Bedroom', prompt: 'cozy and modern bedroom' },
+        { icon: '🍳', name: 'Nhà bếp', sub: 'Kitchen', prompt: 'modern clean kitchen' },
+        { icon: '🏡', name: 'Ban công', sub: 'Balcony', prompt: 'balcony view of outdoors' },
+        { icon: '🏊', name: 'Hồ bơi', sub: 'Pool', prompt: 'luxury swimming pool area' },
+        { icon: '🧘', name: 'Phòng yoga', sub: 'Yoga', prompt: 'peaceful yoga studio' },
+        { icon: '📚', name: 'Thư viện', sub: 'Library', prompt: 'classic library with books' },
+        { icon: '🏛️', name: 'Bảo tàng', sub: 'Museum', prompt: 'art museum interior' },
+        { icon: '🎬', name: 'Rạp chiếu phim', sub: 'Cinema', prompt: 'movie theater interior' },
+        { icon: '🍸', name: 'Quán bar', sub: 'Bar', prompt: 'stylish bar with dim lighting' },
+        { icon: '💒', name: 'Vườn cưới', sub: 'Wedding', prompt: 'romantic wedding garden setup' },
+        { icon: '🏝️', name: 'Đảo nhiệt đới', sub: 'Island', prompt: 'tropical island paradise' },
+        { icon: '💧', name: 'Thác nước', sub: 'Waterfall', prompt: 'majestic waterfall' },
+        { icon: '🏔️', name: 'Núi non', sub: 'Mountain', prompt: 'majestic mountain landscape' },
+        { icon: '❄️', name: 'Tuyết rơi', sub: 'Snow', prompt: 'winter landscape with falling snow' },
+        { icon: '🌵', name: 'Sa mạc', sub: 'Desert', prompt: 'desert landscape with dunes' },
+        { icon: '💜', name: 'Cánh lavender', sub: 'Lavender', prompt: 'lavender field' },
+        { icon: '🌸', name: 'Hoa anh đào', sub: 'Sakura', prompt: 'cherry blossom park' },
+        { icon: '🍂', name: 'Mùa thu', sub: 'Autumn', prompt: 'autumn park with falling leaves' },
+        { icon: '🏰', name: 'Lâu đài', sub: 'Castle', prompt: 'fairytale castle' },
+        { icon: '🏡', name: 'Biệt thự', sub: 'Villa', prompt: 'luxury villa exterior' },
+        { icon: '🛳️', name: 'Du thuyền', sub: 'Cruise', prompt: 'luxury cruise ship deck' },
+        { icon: '✈️', name: 'Máy bay', sub: 'Airplane', prompt: 'private jet interior' },
+        { icon: '🚂', name: 'Tàu hỏa', sub: 'Train', prompt: 'luxury train interior' },
+        { icon: '🏢', name: 'Tòa nhà cao', sub: 'Tower', prompt: 'view from high-rise building' },
+        { icon: '🚜', name: 'Nông trại', sub: 'Farm', prompt: 'rustic farm landscape' },
+        { icon: '🌿', name: 'Nhà kính', sub: 'Greenhouse', prompt: 'plant greenhouse' },
+        { icon: '🏫', name: 'Trường học', sub: 'School', prompt: 'school classroom or hallway' },
+        { icon: '🏟️', name: 'Sân vận động', sub: 'Stadium', prompt: 'sports stadium' },
+        { icon: '🪐', name: 'Vũ trụ', sub: 'Space', prompt: 'outer space background' },
+        { icon: '🎨', name: 'Xưởng vẽ', sub: 'Art', prompt: 'art studio with paintings' },
+        { icon: '🎮', name: 'Gaming Room', sub: 'Gamer', prompt: 'neon gaming room setup' },
+        { icon: '⛩️', name: 'Nhật Bản', sub: 'Japan', prompt: 'traditional japanese street' },
+        { icon: '💂', name: 'London', sub: 'UK', prompt: 'London street with red bus' },
     ];
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,17 +111,31 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
         }
     };
 
-    const handleGenerate = async (destinationPrompt?: string) => {
+    const handlePresetSelect = (prompt: string) => {
+        if (selectedPreset === prompt) {
+            setSelectedPreset(null); // Deselect if clicking the same one
+        } else {
+            setSelectedPreset(prompt);
+        }
+    };
+
+    const handleGenerate = async () => {
         if (!file) {
             setError('Vui lòng tải ảnh lên trước.');
             return;
         }
         
-        const promptToUse = destinationPrompt || customDestination;
+        let promptToUse = selectedPreset;
         
-        if (!promptToUse.trim()) {
-            setError('Vui lòng chọn địa điểm hoặc nhập mô tả.');
+        // Logic: Must have either a selected preset OR a custom prompt text
+        if (!promptToUse && !customPrompt.trim()) {
+            setError('Vui lòng chọn bối cảnh hoặc nhập prompt.');
             return;
+        }
+
+        if (promptToUse === 'RANDOM') {
+             const randomBg = backgrounds.filter(b => b.prompt !== 'RANDOM' && b.prompt !== 'REMOVE_BG')[Math.floor(Math.random() * (backgrounds.length - 2))];
+             promptToUse = randomBg.prompt;
         }
 
         if (trialEnded) {
@@ -85,8 +149,7 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
         setError(null);
         setResultUrl(null);
         setProgress(0);
-        setStatusText('Đang chuẩn bị hành lý...');
-
+        
         try {
             const reader = new FileReader();
             reader.readAsDataURL(file);
@@ -95,15 +158,32 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
                     const base64 = (reader.result as string).split(',')[1];
                     const mimeType = file.type;
                     
-                    setProgress(30);
-                    setStatusText('Đang bay đến địa điểm...');
-                    
-                    const fullPrompt = `Change the background to: ${promptToUse}. ${additionalPrompt}. Maintain the subject perfectly. Photorealistic, high resolution.`;
-                    
-                    const result = await editImageWithText(base64, mimeType, fullPrompt);
+                    let result = '';
+
+                    if (promptToUse === 'REMOVE_BG') {
+                         setStatusText('Đang xóa nền...');
+                         setProgress(30);
+                         result = await removeBackground(base64, mimeType);
+                    } else {
+                         setStatusText('Đang xử lý yêu cầu...');
+                         setProgress(30);
+                         
+                         // Construct prompt intelligently
+                         let parts = [];
+                         if (promptToUse) {
+                             parts.push(`Change the background to: ${promptToUse}.`);
+                         }
+                         if (customPrompt.trim()) {
+                             parts.push(customPrompt.trim());
+                         }
+                         parts.push("Maintain the subject perfectly. Photorealistic, high resolution.");
+                         
+                         const fullPrompt = parts.join(' ');
+                         result = await editImageWithText(base64, mimeType, fullPrompt);
+                    }
                     
                     setProgress(100);
-                    setStatusText('Đã đến nơi!');
+                    setStatusText('Hoàn tất!');
                     setResultUrl(result);
                     setLoading(false);
                 } catch (err: any) {
@@ -158,18 +238,26 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
                          )}
                      </div>
 
-                     {/* Destinations */}
+                     {/* Destinations Grid */}
                      <div>
-                         <h3 className="text-sm font-medium text-slate-300 mb-3">Chọn điểm đến phổ biến:</h3>
-                         <div className="grid grid-cols-2 gap-2">
-                             {destinations.map(dest => (
+                         <h3 className="text-sm font-medium text-slate-300 mb-3 flex items-center gap-2">
+                             🎨 Chọn Bối Cảnh ({backgrounds.length} môi trường)
+                         </h3>
+                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
+                             {backgrounds.map((bg) => (
                                  <button
-                                    key={dest.id}
-                                    onClick={() => handleGenerate(dest.prompt)}
+                                    key={bg.name}
+                                    onClick={() => handlePresetSelect(bg.prompt)}
                                     disabled={loading || trialEnded || !file}
-                                    className="bg-slate-700 hover:bg-emerald-600 hover:text-white text-slate-300 py-2 px-3 rounded-md text-sm transition-colors text-left truncate disabled:opacity-50"
+                                    className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all group disabled:opacity-50 disabled:cursor-not-allowed
+                                        ${selectedPreset === bg.prompt 
+                                            ? 'bg-emerald-900/50 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
+                                            : 'bg-slate-800/80 border-slate-700/50 hover:bg-slate-700 hover:border-slate-500'
+                                        }`}
                                  >
-                                     📍 {dest.name}
+                                     <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">{bg.icon}</span>
+                                     <span className="text-xs font-bold text-slate-200 text-center">{bg.name}</span>
+                                     <span className="text-[10px] text-slate-500 text-center">{bg.sub}</span>
                                  </button>
                              ))}
                          </div>
@@ -177,20 +265,20 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
 
                      {/* Custom */}
                      <div>
-                         <label className="block text-sm font-medium text-slate-300 mb-2">Hoặc nhập địa điểm bất kỳ:</label>
+                         <label className="block text-sm font-medium text-slate-300 mb-2">Nhập prompt tùy chọn (nếu cần):</label>
                          <div className="flex gap-2">
                              <input 
                                 type="text" 
-                                value={customDestination} 
-                                onChange={(e) => setCustomDestination(e.target.value)}
-                                placeholder="Ví dụ: Đỉnh núi Everest, Quảng trường Đỏ..."
+                                value={customPrompt} 
+                                onChange={(e) => setCustomPrompt(e.target.value)}
+                                placeholder="Ví dụ: thay đổi biểu cảm nhân vật, làm cho trời tối hơn..."
                                 className="flex-grow bg-slate-900/70 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-emerald-500 text-sm"
                                 disabled={loading || trialEnded}
                              />
                              <button 
-                                onClick={() => handleGenerate()}
-                                disabled={loading || trialEnded || !file || !customDestination}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition-colors disabled:opacity-50"
+                                onClick={handleGenerate}
+                                disabled={loading || trialEnded || !file || (!selectedPreset && !customPrompt)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 shadow-lg hover:shadow-emerald-500/30 whitespace-nowrap"
                              >
                                  Đi!
                              </button>
