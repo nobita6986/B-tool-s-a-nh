@@ -474,33 +474,31 @@ export const generateAdCreative = async (
         const results: string[] = [];
         const errors: string[] = [];
 
-        // Generate 2 images sequentially
-        for (let i = 0; i < 2; i++) {
-            try {
-                const response = await ai.models.generateContent({
-                    model: modelId,
-                    contents: { parts },
-                    config: {
-                        responseModalities: [Modality.IMAGE],
-                    },
-                });
+        // Generate 1 image
+        try {
+            const response = await ai.models.generateContent({
+                model: modelId,
+                contents: { parts },
+                config: {
+                    responseModalities: [Modality.IMAGE],
+                },
+            });
 
-                const candidate = response.candidates?.[0];
-                if (!candidate) throw new Error("No response.");
-                if (candidate.finishReason === 'SAFETY') throw new Error("Safety block.");
+            const candidate = response.candidates?.[0];
+            if (!candidate) throw new Error("No response.");
+            if (candidate.finishReason === 'SAFETY') throw new Error("Safety block.");
 
-                const imagePart = candidate.content?.parts?.find(p => p.inlineData);
-                if (imagePart?.inlineData?.data) {
-                    const newBase64 = imagePart.inlineData.data;
-                    const newMimeType = imagePart.inlineData.mimeType;
-                    results.push(`data:${newMimeType};base64,${newBase64}`);
-                } else {
-                    throw new Error("No image data.");
-                }
-            } catch (err: any) {
-                if (err.message?.includes('429') || err.status === 429 || err.code === 429) throw err;
-                errors.push(err.message);
+            const imagePart = candidate.content?.parts?.find(p => p.inlineData);
+            if (imagePart?.inlineData?.data) {
+                const newBase64 = imagePart.inlineData.data;
+                const newMimeType = imagePart.inlineData.mimeType;
+                results.push(`data:${newMimeType};base64,${newBase64}`);
+            } else {
+                throw new Error("No image data.");
             }
+        } catch (err: any) {
+            if (err.message?.includes('429') || err.status === 429 || err.code === 429) throw err;
+            errors.push(err.message);
         }
 
         if (results.length === 0) {
@@ -634,23 +632,24 @@ export const dressOnModel = async (
     const modelId = getModelConfig().imageEditModel;
     return withRetry(async (ai) => {
         const promptText = `
-        Task: Virtual Try-On / Dress the model.
+        JOB: High-Fidelity Virtual Try-On.
 
-        **SOURCE IMAGE (Clothing)**:
-        - EXTRACT: Only the clothing items (shirts, pants, dresses, skirts), jewelry, and accessories.
-        - IGNORE: The body shape, pose, face, hair, and background of this image. Do not let the source model's features bleed into the result.
+        **INPUTS**:
+        - **IMAGE 1 (The Garment)**: This image contains the clothing to be worn.
+        - **IMAGE 2 (The Person)**: This image contains the model who will wear the clothing.
 
-        **TARGET IMAGE (Model)**:
-        - KEEP: The EXACT face, facial features, hair, body shape, pose, and skin tone.
-        - ACTION: Dress this specific person in the extracted clothing from the Source Image.
-
-        **Instructions**:
-        1. Fit the extracted clothing naturally onto the Target Model's body, respecting their pose.
-        2. Ensure the Target Model's face remains unchanged and recognizable.
-        3. Match lighting and shadows to the Target Model's environment.
-        ${userPrompt ? `4. User Note: "${userPrompt}"` : ""}
-        5. High quality, photorealistic, no text/watermarks.
-        6. Aspect Ratio: ${aspectRatio}.
+        **INSTRUCTIONS**:
+        1.  **IDENTIFY**: Take the clothing items (e.g., tops, bottoms, dresses) from **IMAGE 1**.
+        2.  **APPLY**: Put these clothing items onto the person in **IMAGE 2**.
+        3.  **PRESERVE IDENTITY**: The face, hair, and body shape of the person in **IMAGE 2** MUST remain exactly the same. Do not generate a new face. Do not change the pose.
+        4.  **FIT & REALISM**: The clothing must drape naturally over the person's body in **IMAGE 2**, respecting their pose (sitting, standing, etc.). Lighting on the clothes must match **IMAGE 2**.
+        
+        ${userPrompt ? `**ADDITIONAL REQUIREMENT**: ${userPrompt}` : ""}
+        
+        **OUTPUT REQUIREMENTS**:
+        - Photorealistic, 8k resolution.
+        - Aspect Ratio: ${aspectRatio}.
+        - No artifacts, no text.
         `;
 
         const response = await ai.models.generateContent({

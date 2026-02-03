@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useLanguage } from '../i18n';
@@ -69,7 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <div className="text-center mb-16">
-        <h2 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-fuchsia-500 to-amber-400 mb-6">
+        <h2 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-fuchsia-500 to-amber-400 mb-6 pb-2 leading-tight">
           {t('header.tagline')}
         </h2>
         <p className="text-lg md:text-xl text-slate-400 max-w-3xl mx-auto">
