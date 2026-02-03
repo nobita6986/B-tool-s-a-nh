@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { generateAdCreative, AspectRatio, ImageInput } from '../services/geminiService';
 import { useLanguage } from '../i18n';
@@ -6,6 +7,7 @@ import TrialEndedCta from '../components/TrialEndedCta';
 import type { Page } from '../App';
 import TransferMenu from '../components/TransferMenu';
 import ProgressBar from '../components/ProgressBar';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
 
 interface AdCreativeGeneratorProps {
   isTrial: boolean;
@@ -143,6 +145,15 @@ const AdCreativeGenerator: React.FC<AdCreativeGeneratorProps> = ({
         link.click();
         document.body.removeChild(link);
     };
+    
+    // Determine which image to show as "Before" in the slider
+    const getBeforeImage = () => {
+        if (modelImage.url) return modelImage.url;
+        if (clothingImage.url) return clothingImage.url;
+        if (accessoryImage.url) return accessoryImage.url;
+        return null;
+    };
+    const beforeImageUrl = getBeforeImage();
 
     return (
         <div className="flex flex-col items-center">
@@ -211,8 +222,25 @@ const AdCreativeGenerator: React.FC<AdCreativeGeneratorProps> = ({
 
                     {!loading && resultImage && (
                         <div className="w-full flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
-                             <img src={resultImage} alt="Result" className="max-h-[500px] w-auto object-contain rounded-lg shadow-lg border border-slate-600" onClick={() => onOpenPreview(resultImage, handleDownload)}/>
-                             <div className="flex gap-2">
+                             {/* Comparison Slider if possible */}
+                             {beforeImageUrl ? (
+                                 <div className="w-full aspect-auto h-[500px]">
+                                    <BeforeAfterSlider 
+                                        beforeImage={beforeImageUrl} 
+                                        afterImage={resultImage} 
+                                        onDownload={handleDownload}
+                                    />
+                                 </div>
+                             ) : (
+                                 <img 
+                                    src={resultImage} 
+                                    alt="Result" 
+                                    className="max-h-[500px] w-auto object-contain rounded-lg shadow-lg border border-slate-600 cursor-pointer" 
+                                    onClick={() => onOpenPreview(resultImage, handleDownload)}
+                                 />
+                             )}
+                             
+                             <div className="flex gap-2 w-full justify-center">
                                 <button onClick={() => onOpenPreview(resultImage, handleDownload)} className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow-md">
                                     <DownloadIcon className="w-5 h-5" /> {t('common.previewAndDownload')}
                                 </button>

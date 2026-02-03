@@ -7,6 +7,7 @@ import TrialEndedCta from '../components/TrialEndedCta';
 import type { Page } from '../App';
 import TransferMenu from '../components/TransferMenu';
 import ProgressBar from '../components/ProgressBar';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
 
 interface OnlineTravelGeneratorProps {
   isTrial: boolean;
@@ -299,7 +300,15 @@ const OnlineTravelGenerator: React.FC<OnlineTravelGeneratorProps> = ({
                     
                     {!loading && resultUrl && (
                         <div className="w-full flex flex-col items-center gap-4">
-                             <img src={resultUrl} alt="Result" className="w-full max-h-[500px] object-contain rounded-lg shadow-lg border border-slate-600" />
+                             {/* Comparison Slider */}
+                             <div className="w-full h-[500px]">
+                                <BeforeAfterSlider 
+                                    beforeImage={previewUrl || ''} 
+                                    afterImage={resultUrl} 
+                                    onDownload={handleDownload}
+                                />
+                             </div>
+                             
                              <div className="flex gap-2">
                                 <button onClick={handleDownload} className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:from-green-600 hover:to-teal-700 transition-all shadow-md">
                                     <DownloadIcon className="w-5 h-5" /> {t('common.previewAndDownload')}

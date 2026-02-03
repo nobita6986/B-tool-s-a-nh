@@ -9,6 +9,7 @@ import type { ImageToEdit, Page } from '../App';
 import ProgressBar from '../components/ProgressBar';
 import { useLanguage } from '../i18n';
 import TransferMenu from '../components/TransferMenu';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
 
 interface ImageEditorProps {
   initialImage: ImageToEdit | null;
@@ -465,34 +466,43 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
         {/* Right Side: Result */}
         <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 border border-slate-700 rounded-xl shadow-2xl p-6 flex flex-col items-center justify-center min-h-[500px]">
           <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-4 self-start">{t('common.results')}</h2>
-          <div className="w-full h-full min-h-[300px] bg-slate-900/50 rounded-lg flex items-center justify-center border border-dashed border-slate-600 relative overflow-hidden">
+          
             {loading && (
               <div className="w-full max-w-sm z-10 p-4">
                 <ProgressBar progress={progress} statusText={statusText} accentColor="sky" />
               </div>
             )}
+            
             {editedImage && !loading && (
-              <img src={editedImage} alt="Edited" className="max-w-full max-h-[600px] object-contain rounded-md transition-all duration-300"/>
-            )}
-            {!editedImage && !loading && (
-              <p className="text-slate-500">{t('imageEditor.resultsPlaceholder')}</p>
-            )}
-          </div>
-          {editedImage && !loading && (
-            <div className='w-full mt-4 flex flex-col gap-4'>
-              <div className="flex gap-2">
-                  <button
-                    onClick={() => onOpenPreview(editedImage, handleDownload)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-3 px-6 rounded-lg hover:from-green-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-green-500/30"
-                    aria-label="Xem trước và lưu ảnh"
-                  >
-                    <EyeIcon className="w-5 h-5" />
-                    {t('common.previewAndDownload')}
-                  </button>
-                  <TransferMenu imageUrl={editedImage} onNavigate={onNavigate} />
+              <div className="w-full flex flex-col items-center gap-4">
+                  {/* Before/After Slider */}
+                  <div className="w-full h-[500px]">
+                    <BeforeAfterSlider 
+                        beforeImage={originalImage || ''} 
+                        afterImage={editedImage} 
+                        onDownload={handleDownload}
+                    />
+                  </div>
+
+                  <div className="flex gap-2 w-full justify-center">
+                    <button
+                        onClick={() => onOpenPreview(editedImage, handleDownload)}
+                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-green-500 to-teal-600 text-white font-bold py-2 px-6 rounded-lg hover:from-green-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-green-500/30"
+                        aria-label="Xem trước và lưu ảnh"
+                    >
+                        <EyeIcon className="w-5 h-5" />
+                        {t('common.previewAndDownload')}
+                    </button>
+                    <TransferMenu imageUrl={editedImage} onNavigate={onNavigate} />
+                  </div>
               </div>
-            </div>
-          )}
+            )}
+            
+            {!editedImage && !loading && (
+              <div className="w-full h-full min-h-[300px] bg-slate-900/50 rounded-lg flex items-center justify-center border border-dashed border-slate-600">
+                  <p className="text-slate-500">{t('imageEditor.resultsPlaceholder')}</p>
+              </div>
+            )}
         </div>
       </div>
     </div>
