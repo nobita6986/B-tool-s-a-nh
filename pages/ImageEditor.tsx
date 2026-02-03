@@ -1,6 +1,7 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { removeBackground, restoreOldPhoto, upscaleImage, editImageWithText, processBreastLift } from '../services/geminiService';
-import { LoaderIcon, SparklesIcon, EyeIcon, ChevronDownIcon } from '../components/Icons';
+import { removeBackground, restoreOldPhoto, upscaleImage, editImageWithText, processBreastLift, AspectRatio } from '../services/geminiService';
+import { LoaderIcon, SparklesIcon, EyeIcon, ChevronDownIcon, AspectRatioSquareIcon, AspectRatioTallIcon, AspectRatioWideIcon } from '../components/Icons';
 import PromptExamples from '../components/PromptExamples';
 import ColorPalette from '../components/ColorPalette';
 import TrialEndedCta from '../components/TrialEndedCta';
@@ -42,6 +43,60 @@ const base64ToFile = async (base64: string, filename: string): Promise<File> => 
     return new File([blob], filename, { type: blob.type });
 };
 
+// Canvas helper for padding image (Outpainting preparation)
+const padImage = (base64: string, ratio: AspectRatio): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            let targetW = img.width;
+            let targetH = img.height;
+            const currentRatio = img.width / img.height;
+            
+            let targetRatioVal = 1;
+            if (ratio === '16:9') targetRatioVal = 16/9;
+            else if (ratio === '9:16') targetRatioVal = 9/16;
+            else if (ratio === '1:1') targetRatioVal = 1;
+
+            if (currentRatio < targetRatioVal) {
+                // Current is narrower than target -> Expand Width
+                targetW = img.height * targetRatioVal;
+            } else {
+                // Current is wider than target -> Expand Height
+                targetH = img.width / targetRatioVal;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                // 1. Fill with transparent background (default in canvas)
+                ctx.clearRect(0, 0, targetW, targetH);
+                
+                // 2. Center image
+                const x = (targetW - img.width) / 2;
+                const y = (targetH - img.height) / 2;
+                ctx.drawImage(img, x, y);
+                
+                // Return as PNG to preserve transparency
+                // The base64 string includes the data:image/png;base64, prefix
+                const result = canvas.toDataURL('image/png');
+                resolve(result);
+            } else {
+                resolve(base64); // Fallback
+            }
+        };
+        img.src = base64; // base64 includes prefix if coming from fileToBase64 usually? 
+        // Note: our fileToBase64 returns {base64, mimeType}. We need to reconstruct full string for Image.src
+        if (!base64.startsWith('data:')) {
+            img.src = `data:image/png;base64,${base64}`;
+        } else {
+             img.src = base64;
+        }
+    });
+};
+
+
 const colorPalette = [
     { name: 'Đỏ', hex: '#ef4444' },
     { name: 'Cam', hex: '#f97316' },
@@ -78,7 +133,8 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
   const [error, setError] = useState<string | null>(null);
   
   const [activeTool, setActiveTool] = useState<string>('describe');
-  
+  const [expandRatio, setExpandRatio] = useState<AspectRatio>('16:9');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [progress, setProgress] = useState<number>(0);
@@ -89,9 +145,10 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
   const tools = [
     { id: 'describe', translationKey: 'imageEditor.editWithDescription' },
     { id: 'removeBg', translationKey: 'imageEditor.removeBackground' },
-    { id: 'breastLift', translationKey: 'imageEditor.breastLift' }, // New Tool
+    { id: 'breastLift', translationKey: 'imageEditor.breastLift' },
     { id: 'restore', translationKey: 'imageEditor.restoreOldPhoto' },
     { id: 'upscale', translationKey: 'imageEditor.upscaleImage' },
+    { id: 'expand', translationKey: 'imageEditor.expandImage' },
   ];
   
   // Listen for tool change event from dashboard or elsewhere
@@ -233,6 +290,21 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
           setStatusText(t('imageEditor.statusBreastLifting'));
           resultUrl = await processBreastLift(base64, mimeType);
           break;
+        case 'expand':
+          setStatusText('Đang mở rộng khung hình...');
+          // 1. Pad image
+          const paddedDataUrl = await padImage(base64, expandRatio);
+          const [header, paddedBase64] = paddedDataUrl.split(',');
+          const paddedMime = header.match(/:(.*?);/)?.[1] || 'image/png';
+          
+          // 2. Edit
+          setStatusText('AI đang vẽ thêm chi tiết...');
+          resultUrl = await editImageWithText(
+              paddedBase64, 
+              paddedMime, 
+              "Seamlessly fill in the transparent areas to extend the image, matching the lighting, style, and context of the original center content. High resolution, photorealistic."
+          );
+          break;
         case 'describe':
         default:
           setStatusText('AI đang phân tích yêu cầu...');
@@ -331,14 +403,6 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
                     </button>
                   ))}
                 </div>
-                 <p className="text-center text-slate-500 my-4 text-sm">{t('imageEditor.orSelectNewAspectRatio')}</p>
-                <button
-                  onClick={() => {}}
-                  disabled
-                  className="w-full text-left p-3 rounded-lg font-medium text-base bg-slate-700/50 text-slate-200 opacity-50 cursor-not-allowed"
-                >
-                  {t('imageEditor.expandImage')}
-                </button>
               </div>
 
               {activeTool === 'describe' && (
@@ -354,6 +418,24 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
                   <PromptExamples prompts={editingPrompts} onSelectPrompt={setPrompt} colorScheme="fuchsia" />
                   <ColorPalette colors={colorPalette} onSelectColor={(color) => setPrompt(p => `${p}, using the color ${color}`)} />
                 </div>
+              )}
+
+              {activeTool === 'expand' && (
+                  <div className="flex flex-col gap-3 bg-slate-800/50 p-4 rounded-lg border border-slate-600">
+                      <p className="text-sm font-medium text-slate-300">{t('imageEditor.orSelectNewAspectRatio') || 'Chọn tỷ lệ khung hình mới:'}</p>
+                      <div className="flex gap-2">
+                          <button onClick={() => setExpandRatio('9:16')} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${expandRatio === '9:16' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
+                              <AspectRatioTallIcon className="w-4 h-4"/> Dọc (9:16)
+                          </button>
+                          <button onClick={() => setExpandRatio('16:9')} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${expandRatio === '16:9' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
+                              <AspectRatioWideIcon className="w-4 h-4"/> Ngang (16:9)
+                          </button>
+                          <button onClick={() => setExpandRatio('1:1')} className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm border ${expandRatio === '1:1' ? 'bg-blue-600 border-blue-400 text-white' : 'bg-slate-700 border-slate-600 text-slate-300 hover:bg-slate-600'}`}>
+                              <AspectRatioSquareIcon className="w-4 h-4"/> Vuông (1:1)
+                          </button>
+                      </div>
+                      <p className="text-xs text-slate-400 italic mt-1">*AI sẽ tự động vẽ thêm chi tiết vào phần mở rộng.</p>
+                  </div>
               )}
             
               <div className="mt-auto pt-6 border-t border-slate-700/50">
@@ -383,14 +465,14 @@ const ImageEditor: React.FC<ImageEditorProps> = ({ initialImage, onEditComplete,
         {/* Right Side: Result */}
         <div className="bg-gradient-to-b from-slate-800/60 to-slate-900/40 border border-slate-700 rounded-xl shadow-2xl p-6 flex flex-col items-center justify-center min-h-[500px]">
           <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400 mb-4 self-start">{t('common.results')}</h2>
-          <div className="w-full aspect-square bg-slate-900/50 rounded-lg flex items-center justify-center border border-dashed border-slate-600">
+          <div className="w-full h-full min-h-[300px] bg-slate-900/50 rounded-lg flex items-center justify-center border border-dashed border-slate-600 relative overflow-hidden">
             {loading && (
-              <div className="w-full max-w-sm">
+              <div className="w-full max-w-sm z-10 p-4">
                 <ProgressBar progress={progress} statusText={statusText} accentColor="sky" />
               </div>
             )}
             {editedImage && !loading && (
-              <img src={editedImage} alt="Edited" className="w-full h-full object-contain rounded-md transition-all duration-300"/>
+              <img src={editedImage} alt="Edited" className="max-w-full max-h-[600px] object-contain rounded-md transition-all duration-300"/>
             )}
             {!editedImage && !loading && (
               <p className="text-slate-500">{t('imageEditor.resultsPlaceholder')}</p>
